@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>👾 OctoArcade Invaders</title>
+  <link rel="stylesheet" href="src/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>👾</text></svg>" />
+</head>
+<body>
+  <header>
+    <h1>👾 OctoArcade Invaders</h1>
+    <p>Defend the repo. Clear the swarm.</p>
+  </header>
+
+  <div class="stage">
+    <canvas id="game" width="800" height="600" tabindex="0" aria-label="OctoArcade Invaders game"></canvas>
+  </div>
+
+  <div class="controls">
+    <button id="reset" type="button">Reset</button>
+    <span id="control-hint" style="color:var(--dim);font-size:12px;">← → / A D move · SPACE fire · P pause</span>
+  </div>
+
+  <footer>
+    <strong>OctoArcade Invaders</strong> - cannon, beams, aliens, bombs and barriers.
+    Keyboard required.
+  </footer>
+
+  <!-- Classic scripts, loaded in dependency order so it also runs from file:// -->
+  <script src="src/core.js"></script>
+  <script src="src/sprites.js"></script>
+  <script src="src/entities.js"></script>
+  <script src="src/game.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
