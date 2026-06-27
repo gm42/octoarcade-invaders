@@ -22,6 +22,14 @@ Keyboard only for now.
 | Pause | `P` |
 | Start / resume | `Enter` |
 
+## What's in it
+
+- A 5 × 11 formation of three alien types that marches, drops bombs, and speeds up as it thins out
+- Four barriers that both sides chew through
+- A bonus UFO worth 50 to 300 points
+- Endless waves. Each one is faster, starts lower, and throws more bombs
+- Three lives
+
 ## License
 
 MPL 2.0. See [LICENSE](LICENSE).
