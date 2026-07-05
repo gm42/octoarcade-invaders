@@ -7,7 +7,7 @@ A browser arcade shooter on a plain HTML5 canvas. No build step, no dependencies
 
 ## Play
 
-Open `index.html` in a browser, or serve the folder with any static server:
+Open `index.html` in a browser, or serve the folder so high scores stick to one origin:
 
 ```sh
 python -m http.server 8000
@@ -28,7 +28,13 @@ Keyboard only for now.
 - Four barriers that both sides chew through
 - A bonus UFO worth 50 to 300 points
 - Endless waves. Each one is faster, starts lower, and throws more bombs
-- Three lives
+- Three lives, and a local top-five leaderboard with initials
+
+## High scores
+
+Scores are saved in `localStorage`, so they stay on this browser. If storage is blocked or
+the saved data is broken the page says so and the game keeps working without a leaderboard.
+To wipe the board, delete the `octoarcade.scores` key in devtools and reload.
 
 ## License
 
