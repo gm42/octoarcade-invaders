@@ -36,6 +36,16 @@ Scores are saved in `localStorage`, so they stay on this browser. If storage is 
 the saved data is broken the page says so and the game keeps working without a leaderboard.
 To wipe the board, delete the `octoarcade.scores` key in devtools and reload.
 
+## Tests
+
+Needs Node:
+
+```sh
+node --test tests/game.test.cjs
+```
+
+They run the game in a VM with fake storage and fixed randomness. No browser needed.
+
 ## License
 
 MPL 2.0. See [LICENSE](LICENSE).
