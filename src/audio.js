@@ -1,8 +1,8 @@
 /*
- * audio.js - Web Audio sound effects (no asset files).
+ * audio.js - Web Audio effects and a looping level soundtrack (no asset files).
  *
  * The AudioContext can only start after a user gesture, so unlock() is called
- * from the first keypress. Effects are short oscillator blips.
+ * from the first keypress. Effects are short blips; music uses the audio clock.
  */
 
 const Sfx = {
@@ -17,6 +17,7 @@ const Sfx = {
 
   toggle() {
     this.enabled = !this.enabled;
+    if (!this.enabled) Music.stop(true);
     return this.enabled;
   },
 
@@ -44,5 +45,63 @@ const Sfx = {
   level() {
     this.tone(440, 0.1, 'square', 0.14);
     setTimeout(() => this.tone(660, 0.14, 'square', 0.14), 110);
+  },
+};
+
+const Music = {
+  // Original 32-step melody in C minor, with a simple bass accompaniment.
+  melody: [60, null, 63, 67, 63, null, 58, 55, 60, 63, 67, null, 70, 67, 63, null,
+    65, null, 68, 72, 68, null, 63, 60, 67, 65, 63, 62, 58, null, 55, null],
+  bass: [36, 36, 41, 43],
+  stepSeconds: 0.2,
+  step: 0,
+  nextTime: 0,
+  active: false,
+  notes: new Set(),
+
+  update(state) {
+    if (state !== 'playing' || !Sfx.enabled || !Sfx.ctx) {
+      this.stop(state === 'paused' || (state === 'playing' && !Sfx.enabled));
+      return;
+    }
+    const now = Sfx.ctx.currentTime;
+    if (!this.active) { this.active = true; this.nextTime = now; }
+    // A backgrounded tab resumes at the current clock, without queued catch-up notes.
+    if (this.nextTime < now) this.nextTime = now;
+    while (this.nextTime < now + 0.1) {
+      const pitch = this.melody[this.step];
+      if (pitch !== null) this.note(pitch, this.nextTime, 0.16, 'square', 0.025);
+      if (this.step % 4 === 0) {
+        this.note(this.bass[Math.floor(this.step / 8)], this.nextTime, 0.32, 'triangle', 0.06);
+      }
+      this.step = (this.step + 1) % this.melody.length;
+      this.nextTime += this.stepSeconds;
+    }
+  },
+
+  note(pitch, at, duration, type, volume) {
+    const osc = Sfx.ctx.createOscillator();
+    const gain = Sfx.ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(440 * Math.pow(2, (pitch - 69) / 12), at);
+    gain.gain.setValueAtTime(volume, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    osc.connect(gain).connect(Sfx.ctx.destination);
+    const note = { osc, gain };
+    this.notes.add(note);
+    osc.onended = () => { this.notes.delete(note); osc.disconnect(); gain.disconnect(); };
+    osc.start(at);
+    osc.stop(at + duration);
+  },
+
+  stop(preservePosition = false) {
+    for (const { osc, gain } of this.notes) {
+      osc.stop();
+      osc.disconnect();
+      gain.disconnect();
+    }
+    this.notes.clear();
+    this.active = false;
+    if (!preservePosition) this.step = 0;
   },
 };

@@ -300,3 +300,58 @@ test('bomb firing uses elapsed time even between swarm steps', () => {
   g.bombs.push(result.bomb);
   assert.equal(g.swarm.update(0.01, g).bomb, null);
 });
+
+function audioFixture(h) {
+  const oscillators = [];
+  const ctx = {
+    currentTime: 0, state: 'running', destination: {},
+    createOscillator() {
+      const osc = { frequency: { setValueAtTime(value) { osc.pitch = value; }, linearRampToValueAtTime() {} },
+        stops: [], start(at) { this.at = at; }, stop(at) { this.stops.push(at); },
+        connect(node) { return node; }, disconnect() { this.disconnected = true; },
+      };
+      oscillators.push(osc); return osc;
+    },
+    createGain() { return { gain: { setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+      connect() {}, disconnect() {},
+    }; },
+  };
+  h.api.Sfx.ctx = ctx;
+  return { ctx, oscillators };
+}
+
+test('soundtrack schedules a repeating melody on the audio clock without duplicate notes', () => {
+  const h = harness(); const audio = audioFixture(h); const music = h.api.Music;
+  music.update('start'); assert.equal(audio.oscillators.length, 0);
+  music.update('playing'); const firstPitch = audio.oscillators[0].pitch;
+  assert.equal(audio.oscillators.length, 2);
+  music.update('playing'); assert.equal(audio.oscillators.length, 2);
+  for (let tick = 1; tick <= 70; tick++) { audio.ctx.currentTime = tick * 0.1; music.update('playing'); }
+  assert.ok(audio.oscillators.some(osc => osc.at >= 6.4 && Math.abs(osc.pitch - firstPitch) < 0.001));
+  const finished = [...music.notes][0]; finished.osc.onended(); assert.equal(music.notes.has(finished), false);
+  music.stop(); assert.equal(music.notes.size, 0);
+});
+
+test('soundtrack pauses, obeys the existing sound toggle, and stops on title and game over', () => {
+  const h = harness(); const audio = audioFixture(h); const music = h.api.Music;
+  music.update('playing'); const step = music.step;
+  music.update('paused'); assert.equal(music.active, false); assert.equal(music.step, step);
+  assert.equal(music.notes.size, 0);
+  audio.ctx.currentTime = 10; music.update('playing'); assert.equal(music.active, true);
+  h.api.Sfx.toggle(); assert.equal(music.active, false);
+  const count = audio.oscillators.length; music.update('playing'); assert.equal(audio.oscillators.length, count);
+  h.api.Sfx.toggle(); music.update('playing'); assert.equal(music.active, true);
+  music.update('gameover'); assert.equal(music.step, 0); assert.equal(music.notes.size, 0);
+  music.update('playing'); music.update('start'); assert.equal(music.active, false);
+});
+
+test('page follows gameplay state for music and the sound button cancels scheduled notes', () => {
+  const h = harness(); const ui = bootstrap(h); const audio = audioFixture(h);
+  ui.key('Enter'); ui.frames.shift()(16); assert.equal(h.api.Music.active, true);
+  ui.key('KeyP', 'p'); ui.frames.shift()(32); assert.equal(h.api.Music.active, false);
+  ui.key('KeyP', 'p'); ui.frames.shift()(48); assert.equal(h.api.Music.active, true);
+  ui.nodes.get('sound').listeners.get('click')(); assert.equal(h.api.Music.notes.size, 0);
+  ui.nodes.get('sound').listeners.get('click')(); audio.ctx.currentTime = 1;
+  ui.frames.shift()(64); assert.equal(h.api.Music.active, true);
+  ui.nodes.get('reset').listeners.get('click')(); ui.frames.shift()(80); assert.equal(h.api.Music.active, false);
+});

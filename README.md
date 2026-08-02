@@ -29,6 +29,7 @@ Keyboard only for now.
 - A bonus UFO worth 50 to 300 points
 - Endless waves. Each one is faster, starts lower, and throws more bombs
 - Three lives, and a local top-five leaderboard with initials
+- Chiptune soundtrack and effects straight from the Web Audio API
 
 ## High scores
 
