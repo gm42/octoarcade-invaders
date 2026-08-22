@@ -355,3 +355,55 @@ test('page follows gameplay state for music and the sound button cancels schedul
   ui.frames.shift()(64); assert.equal(h.api.Music.active, true);
   ui.nodes.get('reset').listeners.get('click')(); ui.frames.shift()(80); assert.equal(h.api.Music.active, false);
 });
+
+test('co-op cannons move and fire independently with separate beam limits', () => {
+  const h = harness(); const g = h.game(); g.selectPlayers(2); g.startGame();
+  const [one, two] = g.players;
+  const x1 = one.x, x2 = two.x;
+  g.keys = new Set(['KeyA', 'ArrowRight', 'Space', 'Enter']); g.update(0.01);
+  assert.ok(one.x < x1); assert.ok(two.x > x2);
+  assert.equal(g.beams.filter(beam => beam.owner === one).length, 1);
+  assert.equal(g.beams.filter(beam => beam.owner === two).length, 1);
+  g.beams = Array.from({ length: h.api.CONFIG.player.maxBeams }, () => one.fire());
+  one.cooldown = 0; two.cooldown = 0; g.update(0);
+  assert.equal(g.beams.filter(beam => beam.owner === one).length, 2);
+  assert.equal(g.beams.filter(beam => beam.owner === two).length, 1);
+  g.render(); assert.ok(h.text.includes('P1')); assert.ok(h.text.includes('P2'));
+});
+
+test('co-op shares lives while only the hit cannon respawns', () => {
+  const h = harness(); const g = h.game(); g.selectPlayers(2); g.startGame();
+  const [one, two] = g.players; const originalOne = one.x;
+  two.x += 30;
+  g.bombs = [new h.api.Bomb(two.x + two.w / 2, two.y, 1, 'straight')]; g.update(0);
+  assert.equal(g.lives, 2); assert.equal(two.x, two.spawnX); assert.ok(two.invuln > 0);
+  assert.equal(one.invuln, 0); assert.equal(one.x, originalOne);
+  g.lives = 1; g.score = 100;
+  g.bombs = [new h.api.Bomb(one.x + one.w / 2, one.y, 1, 'straight')]; g.update(0);
+  assert.equal(g.lives, 0); assert.equal(g.state, 'enterscore');
+});
+
+test('co-op selection survives wave progression and reset returns to selection', () => {
+  const h = harness(); const g = h.game();
+  assert.throws(() => g.selectPlayers(3), /one or two/);
+  g.selectPlayers(2); g.startGame();
+  assert.throws(() => g.selectPlayers(1), /start screen/);
+  g.score = 100; g.swarm.aliens = []; g.update(0); g.update(2.1);
+  assert.equal(g.level, 2); assert.equal(g.players.length, 2); assert.equal(g.score, 100);
+  g.resetToStart(); assert.equal(g.state, 'start'); g.selectPlayers(1);
+  g.startGame(); g.keys.add('ArrowLeft'); const x = g.players[0].x; g.update(0.01);
+  assert.ok(g.players[0].x < x); assert.equal(g.players.length, 1);
+});
+
+test('page offers player selection on the title screen and hides it during play', () => {
+  const h = harness(); const ui = bootstrap(h);
+  ui.nodes.get('coop').listeners.get('click')();
+  assert.equal(h.context.currentGame.playerCount, 2);
+  assert.equal(ui.nodes.get('coop')['aria-pressed'], 'true');
+  assert.equal(ui.nodes.get('player-options').hidden, false);
+  ui.key('Enter'); ui.frames.shift()(16);
+  assert.equal(h.context.currentGame.players.length, 2);
+  assert.equal(ui.nodes.get('player-options').hidden, true);
+  ui.nodes.get('reset').listeners.get('click')(); ui.frames.shift()(32);
+  assert.equal(ui.nodes.get('player-options').hidden, false);
+});

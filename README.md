@@ -22,6 +22,9 @@ Keyboard only for now.
 | Pause | `P` |
 | Start / resume | `Enter` |
 
+Pick **1 player** or **2 players** on the title screen. In co-op P1 uses A/D + Space and
+P2 uses ←/→ + Enter. Score and lives are shared.
+
 ## What's in it
 
 - A 5 × 11 formation of three alien types that marches, drops bombs, and speeds up as it thins out
