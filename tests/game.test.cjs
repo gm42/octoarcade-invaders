@@ -407,3 +407,108 @@ test('page offers player selection on the title screen and hides it during play'
   ui.nodes.get('reset').listeners.get('click')(); ui.frames.shift()(32);
   assert.equal(ui.nodes.get('player-options').hidden, false);
 });
+
+test('Map 8 unlocks exactly at the recorded high-score threshold and survives reload', () => {
+  const h = harness(); const g = h.game(); const threshold = h.api.CONFIG.map8.unlockScore;
+  assert.equal(g.map8Unlocked, false);
+  assert.throws(() => g.startGame('map8'), /saved high score/);
+  assert.equal(g.state, 'start');
+  g.score = threshold - 1; g.commitScore('AAA'); assert.equal(g.map8Unlocked, false);
+  g.score = threshold; g.commitScore('BBB'); assert.equal(g.map8Unlocked, true);
+  assert.equal(h.game().map8Unlocked, true);
+  assert.throws(() => g.startGame('other'), /Unknown map/);
+});
+
+test('failed saves and invalid leaderboard data cannot unlock Map 8', () => {
+  const h = harness(); const g = h.game(); g.score = h.api.CONFIG.map8.unlockScore;
+  h.storage.writeError = storageError('QuotaExceededError');
+  assert.throws(() => g.commitScore('AAA'), h.api.LeaderboardError);
+  assert.equal(g.map8Unlocked, false); assert.equal(h.game().map8Unlocked, false);
+  const invalid = harness('[{"score":999999}]');
+  assert.equal(invalid.game().map8Unlocked, false);
+});
+
+test('Map 8 has its own formation, supports co-op, and finishes after one wave', () => {
+  const h = harness('[{"name":"AAA","score":5000}]'); const g = h.game();
+  g.selectPlayers(2); g.startGame('map8');
+  assert.equal(g.players.length, 2); assert.equal(g.level, 8); assert.equal(g.map, 'map8');
+  assert.equal(g.swarm.count, 208);
+  assert.deepEqual(Array.from(g.swarm.aliens.filter(alien => alien.row === 0), alien => alien.col), [5, 6, 18, 19]);
+  g.render(); assert.ok(h.text.includes('MAP 8'));
+  g.score = g.swarm.aliens.reduce((sum, alien) => sum + alien.type.points, 0);
+  g.swarm.aliens = []; g.update(0);
+  assert.equal(g.state, 'levelclear'); g.render(); assert.ok(h.text.includes('MAP 8 CLEARED'));
+  g.update(2.1); assert.equal(g.state, 'enterscore'); assert.equal(g.level, 8);
+  g.handleInitials('Enter', 'Enter'); g.render(); assert.ok(h.text.includes('MAP 8 COMPLETE'));
+  g.onKeyDown('Enter', 'Enter'); g.startGame();
+  assert.equal(g.map, 'standard'); assert.equal(g.swarm.count, 55); assert.equal(g.level, 1);
+});
+
+test('title reveals the Map 8 entry only after a qualifying score is saved', () => {
+  const h = harness(); const ui = bootstrap(h);
+  assert.equal(ui.nodes.get('map8').hidden, true);
+  const g = h.context.currentGame; g.startGame(); g.score = h.api.CONFIG.map8.unlockScore; g.endGame();
+  ui.key('Enter'); ui.key('Enter'); ui.frames.shift()(16);
+  assert.equal(ui.nodes.get('player-options').hidden, false);
+  assert.equal(ui.nodes.get('map8').hidden, false);
+  ui.nodes.get('coop').listeners.get('click')();
+  ui.nodes.get('map8').listeners.get('click')();
+  assert.equal(g.map, 'map8'); assert.equal(g.players.length, 2);
+  assert.equal(ui.nodes.get('player-options').hidden, true);
+});
+
+test('Octocat formation preserves facial gaps and fits its miniature alien collision bounds', () => {
+  const h = harness('[{"name":"AAA","score":5000}]'); const g = h.game(); g.startGame('map8');
+  const layout = h.api.CONFIG.map8;
+  assert.equal(layout.formation.length, 19);
+  assert.ok(layout.formation.every(row => row.length === 23));
+  const occupied = new Set(g.swarm.aliens.map(alien => alien.row + ':' + alien.col));
+  for (let row = 0; row < 19; row++) for (let col = 0; col < 23; col++) {
+    assert.equal(occupied.has(row + ':' + col), layout.formation[row][col] === '#');
+  }
+  assert.equal(occupied.has('5:8'), false); // Left eye opening.
+  assert.equal(occupied.has('5:15'), false); // Right eye opening.
+  assert.equal(occupied.has('11:2'), true); // Raised end of the curled tail.
+  assert.equal(g.swarm.aliens.filter(alien => alien.row === 15).length, 4);
+  for (const alien of g.swarm.aliens) {
+    assert.equal(alien.pixel, 1);
+    assert.ok(alien.w <= layout.cellW && alien.h <= layout.cellH);
+    assert.ok(alien.y > 67); // Clear the HUD and UFO lane.
+    assert.ok(alien.y + alien.h <= g.barriers[0].y - h.api.CONFIG.swarm.stepY);
+  }
+  const target = g.swarm.bottomOf(22); // A column outside the normal 11-column grid.
+  assert.ok(target);
+  g.beams = [new h.api.Beam(target.x, target.y)];
+  g.handleCollisions(); assert.equal(target.dead, true);
+  g.startGame(); assert.equal(g.swarm.count, 55);
+  assert.ok(g.swarm.aliens.every(alien => alien.pixel === 3));
+});
+
+test('Octocat descends four times slower while keeping horizontal speed and bomb timing', () => {
+  const h = harness(); const g = h.game(); g.startGame();
+  const normal = new h.api.Swarm(8, 430);
+  const octocat = new h.api.Swarm(8, 430, 'map8');
+  const interval = normal.stepInterval();
+  assert.equal(octocat.stepInterval(), interval);
+  assert.equal(octocat.bombRate(), normal.bombRate());
+  assert.equal(octocat.maxBombs(), normal.maxBombs());
+  const x = octocat.aliens[0].x, y = octocat.aliens[0].y;
+  octocat.update(interval, g);
+  assert.equal(octocat.aliens[0].x, x + h.api.CONFIG.swarm.stepX);
+  assert.equal(octocat.aliens[0].y, y);
+  function descend(swarm) {
+    swarm.dir = 1;
+    const shift = 800 - h.api.CONFIG.swarm.edgeMargin - swarm.bounds().maxX;
+    for (const alien of swarm.aliens) alien.x += shift;
+    const before = swarm.aliens[0].y;
+    swarm.update(swarm.stepInterval(), g);
+    assert.equal(swarm.dir, -1);
+    return swarm.aliens[0].y - before;
+  }
+  assert.equal(descend(normal), h.api.CONFIG.swarm.stepY);
+  assert.equal(descend(octocat), h.api.CONFIG.swarm.stepY / 4);
+  normal.aliens = [normal.aliens[0]];
+  octocat.aliens = [octocat.aliens[0]];
+  assert.equal(octocat.stepInterval(), normal.stepInterval());
+  assert.equal(descend(octocat), descend(normal) / 4);
+});

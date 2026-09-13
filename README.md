@@ -33,6 +33,7 @@ P2 uses ←/→ + Enter. Score and lives are shared.
 - Endless waves. Each one is faster, starts lower, and throws more bombs
 - Three lives, and a local top-five leaderboard with initials
 - Chiptune soundtrack and effects straight from the Web Audio API
+- A hidden Map 8. Get 5,000 on the board to find it
 
 ## High scores
 
